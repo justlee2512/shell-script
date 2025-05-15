@@ -33,4 +33,5 @@ for file in "$destination_dir"/*; do
 done
 
 echo "Hoàn thành xử lý file!"
+bash check_pid.sh &
 exit 0

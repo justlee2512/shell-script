@@ -4,33 +4,40 @@
 output_dir="/Users/richard/Data/80/files"
 mkdir -p "$output_dir"
 
-# Yêu cầu người dùng nhập số lượng file
-read -p "Nhập số lượng file muốn tạo: " file_count
+# Tổng số file cần tạo
+total_files=10000
 
-# Yêu cầu người dùng nhập khoảng thời gian chờ giữa mỗi lần tạo file (tính bằng giây)
-read -p "Nhập khoảng thời gian chờ giữa mỗi lần tạo file (giây): " delay
+# Số file tạo mỗi lần
+batch_size=1000
 
-# Kiểm tra nếu người dùng không nhập hoặc nhập giá trị không hợp lệ
-if ! [[ "$file_count" =~ ^[0-9]+$ ]] || [ "$file_count" -le 0 ]; then
-    echo "Vui lòng nhập một số nguyên dương hợp lệ cho số lượng file."
+# Thời gian chờ giữa mỗi lần tạo batch (tính bằng giây)
+delay=10
+
+# Kiểm tra nếu tổng số file hoặc batch size không hợp lệ
+if [ "$total_files" -le 0 ] || [ "$batch_size" -le 0 ]; then
+    echo "Vui lòng nhập số lượng file và batch size hợp lệ."
     exit 1
 fi
 
-if ! [[ "$delay" =~ ^[0-9]+$ ]] || [ "$delay" -lt 0 ]; then
-    echo "Vui lòng nhập một số nguyên không âm hợp lệ cho thời gian chờ."
-    exit 1
-fi
+# Tạo file
+batch_count=$((total_files / batch_size))
+for batch in $(seq 1 "$batch_count"); do
+    for file_num in $(seq 1 "$batch_size"); do
+        file_index=$(( (batch - 1) * batch_size + file_num ))
 
-# Tạo file với dung lượng 10,000 kilobit (1,250 KB)
-for random in $(seq 1 "$file_count"); do
-    # Tạo file ABC-DT${random}.csv
-    dd if=/dev/zero of="$output_dir/ABC-DT${random}.csv" bs=125 count=100 &>/dev/null
-    
-    # Tạo file DT${random}.csv.fin
-    dd if=/dev/zero of="$output_dir/DT${random}.fin" bs=125 count=100 &>/dev/null
+        # Tạo file ABC-DT${file_index}.csv
+        dd if=/dev/zero of="$output_dir/ABC-DT${file_index}.csv" bs=125 count=100 &>/dev/null
 
-    # Chờ một khoảng thời gian trước khi tạo file tiếp theo
-    sleep "$delay"
+        # Tạo file DT${file_index}.csv.fin
+        dd if=/dev/zero of="$output_dir/DT${file_index}.fin" bs=125 count=100 &>/dev/null
+    done
+
+    echo "Đã tạo xong batch $batch/$batch_count (tổng cộng $((batch * batch_size)) file)."
+
+    # Chờ trước khi tạo batch tiếp theo
+    if [ "$batch" -lt "$batch_count" ]; then
+        sleep "$delay"
+    fi
 done
 
-echo "Hoàn thành việc tạo $file_count file trong thư mục $output_dir"
+echo "Hoàn thành việc tạo $total_files file trong thư mục $output_dir"
