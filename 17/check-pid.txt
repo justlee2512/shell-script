@@ -4,11 +4,15 @@
 # Tên script cần kiểm tra
 PROCESS_NAME="processfile17.sh"
 
-# Tìm PID của processfile.sh
-PID=$(pgrep -f "$PROCESS_NAME")
+# Tìm tất cả PID của processfile17.sh
+PIDS=$(pgrep -f "$PROCESS_NAME")
+PROCESS_COUNT=$(echo "$PIDS" | wc -l)
 
-if [ -n "$PID" ]; then
-    echo "$PROCESS_NAME is already running with PID $PID. Exiting script."
+if [ "$PROCESS_COUNT" -gt 5 ]; then
+    echo "There are already $PROCESS_COUNT instances of $PROCESS_NAME running. Exiting script."
+    exit 0
+elif [ -n "$PIDS" ]; then
+    echo "$PROCESS_NAME is already running with PIDs: $PIDS. Exiting script."
     exit 0
 else
     echo "$PROCESS_NAME is not running. Starting it..."
