@@ -13,6 +13,12 @@ mkdir -p "$destination_dir"
 rsync -av --remove-source-files "$source_dir/" "$destination_dir/"
 
 # Đổi tên file theo cấu trúc yêu cầu
+if [[ -z $(ls -A "$destination_dir") ]]; then
+    echo "Không có file trong $destination_dir. Dừng script."
+    bash check_pid.sh
+    exit 0
+fi
+
 for file in "$destination_dir"/*; do
     if [[ -f "$file" ]]; then
         base_name=$(basename "$file")
