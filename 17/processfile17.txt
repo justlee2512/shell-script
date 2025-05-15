@@ -11,7 +11,7 @@ hostname=$(hostname)
 mkdir -p "$destination_dir"
 
 # Đồng bộ file từ thư mục số chẵn về thư mục inwark-file
-rsync -av --remove-source-files "$source_dir/" "$destination_dir/"
+rsync -av --remove-source-files -e "ssh" "user@remote_host:$source_dir/" "$destination_dir/"
 
 # Đổi tên file theo cấu trúc yêu cầu
 for file in "$destination_dir"/*; do
