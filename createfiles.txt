@@ -4,26 +4,27 @@
 output_dir="/Users/richard/Data/80/files"
 mkdir -p "$output_dir"
 
-# Tổng số file cần tạo
-total_files=10000
+# Yêu cầu người dùng nhập thông tin
+read -p "Nhập tổng số file cần tạo: " total_files
+read -p "Nhập số file tạo mỗi batch: " batch_size
+read -p "Nhập thời gian chờ giữa mỗi batch (giây): " delay
 
-# Số file tạo mỗi lần
-batch_size=1000
-
-# Thời gian chờ giữa mỗi lần tạo batch (tính bằng giây)
-delay=10
-
-# Kiểm tra nếu tổng số file hoặc batch size không hợp lệ
-if [ "$total_files" -le 0 ] || [ "$batch_size" -le 0 ]; then
-    echo "Vui lòng nhập số lượng file và batch size hợp lệ."
+# Kiểm tra nếu tổng số file, batch size hoặc delay không hợp lệ
+if [ "$total_files" -le 0 ] || [ "$batch_size" -le 0 ] || [ "$delay" -lt 0 ]; then
+    echo "Vui lòng nhập các giá trị hợp lệ."
     exit 1
 fi
 
 # Tạo file
-batch_count=$((total_files / batch_size))
+batch_count=$(( (total_files + batch_size - 1) / batch_size )) # Tính số batch (làm tròn lên)
 for batch in $(seq 1 "$batch_count"); do
     for file_num in $(seq 1 "$batch_size"); do
         file_index=$(( (batch - 1) * batch_size + file_num ))
+
+        # Dừng nếu đã tạo đủ số file
+        if [ "$file_index" -gt "$total_files" ]; then
+            break
+        fi
 
         # Tạo file ABC-DT${file_index}.csv
         dd if=/dev/zero of="$output_dir/ABC-DT${file_index}.csv" bs=125 count=100 &>/dev/null
@@ -32,7 +33,7 @@ for batch in $(seq 1 "$batch_count"); do
         dd if=/dev/zero of="$output_dir/DT${file_index}.fin" bs=125 count=100 &>/dev/null
     done
 
-    echo "Đã tạo xong batch $batch/$batch_count (tổng cộng $((batch * batch_size)) file)."
+    echo "Đã tạo xong batch $batch/$batch_count (tổng cộng $((batch * batch_size > total_files ? total_files : batch * batch_size)) file)."
 
     # Chờ trước khi tạo batch tiếp theo
     if [ "$batch" -lt "$batch_count" ]; then
