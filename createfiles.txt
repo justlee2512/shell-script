@@ -7,9 +7,17 @@ mkdir -p "$output_dir"
 # Yêu cầu người dùng nhập số lượng file
 read -p "Nhập số lượng file muốn tạo: " file_count
 
+# Yêu cầu người dùng nhập khoảng thời gian chờ giữa mỗi lần tạo file (tính bằng giây)
+read -p "Nhập khoảng thời gian chờ giữa mỗi lần tạo file (giây): " delay
+
 # Kiểm tra nếu người dùng không nhập hoặc nhập giá trị không hợp lệ
 if ! [[ "$file_count" =~ ^[0-9]+$ ]] || [ "$file_count" -le 0 ]; then
-    echo "Vui lòng nhập một số nguyên dương hợp lệ."
+    echo "Vui lòng nhập một số nguyên dương hợp lệ cho số lượng file."
+    exit 1
+fi
+
+if ! [[ "$delay" =~ ^[0-9]+$ ]] || [ "$delay" -lt 0 ]; then
+    echo "Vui lòng nhập một số nguyên không âm hợp lệ cho thời gian chờ."
     exit 1
 fi
 
@@ -20,6 +28,9 @@ for random in $(seq 1 "$file_count"); do
     
     # Tạo file DT${random}.csv.fin
     dd if=/dev/zero of="$output_dir/DT${random}.fin" bs=125 count=100 &>/dev/null
+
+    # Chờ một khoảng thời gian trước khi tạo file tiếp theo
+    sleep "$delay"
 done
 
 echo "Hoàn thành việc tạo $file_count file trong thư mục $output_dir"
