@@ -19,11 +19,15 @@ for file in "$destination_dir"/*; do
         if [[ "$base_name" == ABC-DT*.csv ]]; then
             # Đổi tên file ABC-DT${số}.csv
             number=$(echo "$base_name" | grep -oE '[0-9]+')
-            mv "$file" "$proccessed_dir/processed-ABC-DT${number}-${hostname}.csv"
+            new_name="$proccessed_dir/processed-ABC-DT${number}-${hostname}.csv"
+            mv "$file" "$new_name"
+            echo "Đã đổi tên: $base_name -> $(basename "$new_name")"
         elif [[ "$base_name" == DT*.fin ]]; then
             # Đổi tên file DT${số}.fin
             number=$(echo "$base_name" | grep -oE '[0-9]+')
-            mv "$file" "$proccessed_dir/processed-DT${number}.fin"
+            new_name="$proccessed_dir/processed-DT${number}.fin"
+            mv "$file" "$new_name"
+            echo "Đã đổi tên: $base_name -> $(basename "$new_name")"
         fi
     fi
 done
