@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Định nghĩa các thư mục
+source_dir="/Users/richard/Data/80/files/so_le"
+destination_dir="/Users/richard/Data/80/18/inwark-file"
+proccessed_dir="/Users/richard/Data/80/18/process-file"
+hostname=$(hostname)
+
+# Tạo thư mục đích nếu chưa tồn tại
+mkdir -p "$destination_dir"
+
+# Đồng bộ file từ thư mục số lẻ về thư mục inwark-file
+rsync -av --remove-source-files "$source_dir/" "$destination_dir/"
+
+# Đổi tên file theo cấu trúc yêu cầu
+for file in "$destination_dir"/*; do
+    if [[ -f "$file" ]]; then
+        base_name=$(basename "$file")
+        if [[ "$base_name" == ABC-DT*.csv ]]; then
+            # Đổi tên file ABC-DT${số}.csv
+            number=$(echo "$base_name" | grep -oE '[0-9]+')
+            mv "$file" "$proccessed_dir/processed-ABC-DT${number}-${hostname}.csv"
+        elif [[ "$base_name" == DT*.fin ]]; then
+            # Đổi tên file DT${số}.fin
+            number=$(echo "$base_name" | grep -oE '[0-9]+')
+            mv "$file" "$proccessed_dir/processed-DT${number}.fin"
+        fi
+    fi
+done
+
+echo "Hoàn thành xử lý file!"
+exit 0
