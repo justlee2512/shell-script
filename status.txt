@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Hàm hiển thị cách sử dụng script
+usage() {
+  echo "Sử dụng: $0 -service <tên_service>"
+  exit 1
+}
+
+# Kiểm tra tham số đầu vào
+while [[ "$#" -gt 0 ]]; do
+  case $1 in
+    -service) service_name="$2"; shift ;;
+    *) usage ;;
+  esac
+  shift
+done
+
+# Kiểm tra nếu tên service không được cung cấp
+if [[ -z "$service_name" ]]; then
+  echo "Lỗi: Bạn phải cung cấp tên service!"
+  usage
+fi
+
+# Thiết lập XDG_RUNTIME_DIR cho người dùng javadm
+export XDG_RUNTIME_DIR="/run/user/$(id -u javadm)"
+
+# Chạy lệnh với sudo
+sudo -u javadm systemctl --user start "$service_name.service"
+
+# Kiểm tra kết quả
+if [[ $? -eq 0 ]]; then
+  echo "Service $service_name đã được start thành công."
+else
+  echo "Không thể start service $service_name. Vui lòng kiểm tra lại."
+fi
