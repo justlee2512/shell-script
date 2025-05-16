@@ -21,11 +21,12 @@ if [[ -z "$service_name" ]]; then
   usage
 fi
 
-# Thiết lập XDG_RUNTIME_DIR cho người dùng javadm
-export XDG_RUNTIME_DIR="/run/user/$(id -u javadm)"
-
-# Chạy lệnh với sudo
-sudo -u javadm systemctl --user start "$service_name.service"
+# Khởi tạo phiên D-Bus tạm thời và chạy lệnh
+sudo -u javadm bash -c "
+  export XDG_RUNTIME_DIR=/run/user/$(id -u javadm)
+  export DBUS_SESSION_BUS_ADDRESS=unix:path=\$XDG_RUNTIME_DIR/bus
+  systemctl --user start $service_name.service
+"
 
 # Kiểm tra kết quả
 if [[ $? -eq 0 ]]; then
