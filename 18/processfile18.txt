@@ -4,10 +4,13 @@
 source_dir="/Users/richard/Data/80/files/so_le"
 destination_dir="/Users/richard/Data/80/18/inwark-file"
 proccessed_dir="/Users/richard/Data/80/18/process-file"
+other_dir="$proccessed_dir/other"
 hostname=$(hostname)
 
 # Tạo thư mục đích nếu chưa tồn tại
 mkdir -p "$destination_dir"
+mkdir -p "$proccessed_dir"
+mkdir -p "$other_dir"
 
 # Đồng bộ file từ thư mục số lẻ về thư mục inwark-file
 rsync -av --remove-source-files "$source_dir/" "$destination_dir/"
@@ -34,6 +37,10 @@ for file in "$destination_dir"/*; do
             new_name="$proccessed_dir/processed-DT${number}.fin"
             mv "$file" "$new_name"
             echo "Đã đổi tên: $base_name -> $(basename "$new_name")"
+        else
+            # Nếu không khớp định dạng thì chuyển vào thư mục other
+            mv "$file" "$other_dir/"
+            echo "Đã chuyển $base_name vào thư mục other"
         fi
     fi
 done
