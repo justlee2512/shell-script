@@ -58,16 +58,23 @@ process_file() {
 # ========== WORKER POOL ==========
 worker_loop() {
     while true; do
-        file=$(find "$LOCAL_DEST" -maxdepth 1 -type f \( -name "*.csv" -o -name "*.fin" \) | head -n 1)
-        if [ -n "$file" ]; then
-            (
-                flock -n 200 || exit 1
-                [ -f "$file" ] && process_file "$file"
-            ) 200>"$file.lock"
-            rm -f "$file.lock"
-        else
-            sleep 2
-        fi
+        for file in "$LOCAL_DEST"/*.csv "$LOCAL_DEST"/*.fin; do
+            [ -e "$file" ] || { sleep 2; continue; }
+            exec 200>"$file.lock"
+            if flock -n 200; then
+                if [ -f "$file" ]; then
+                    process_file "$file"
+                    rm -f "$file.lock"
+                fi
+                flock -u 200
+                exec 200>&-
+                break
+            else
+                exec 200>&-
+                continue
+            fi
+        done
+        sleep 1
     done
 }
 
