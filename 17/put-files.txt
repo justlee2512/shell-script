@@ -17,13 +17,19 @@ DEST_HOST="vn120158542"
 DEST_DIR="/appvol/tuan/files-out/"
 PUSH_INTERVAL=5
 
-# ======= LOG =======
-LOG_INPUT="/Users/richard/Data/80/18/log/file_sync_input.log"
-LOG_PROCESS="/Users/richard/Data/80/18/log/file_sync_process.log"
-LOG_OUTPUT="/Users/richard/Data/80/18/log/file_sync_output.log"
+# ======= LOG DIR =======
+LOG_DIR="/Users/richard/Data/80/18/log"
+mkdir -p "$LOCAL_DEST" "$PROCESSED_DIR" "$OTHER_DIR" "$LOG_DIR"
 
-mkdir -p "$LOCAL_DEST" "$PROCESSED_DIR" "$OTHER_DIR"
-mkdir -p "$(dirname "$LOG_INPUT")"
+# ==== Hàm log tên file kèm giờ phút giây (chia file theo ngày) ====
+log_file() {
+    # $1: log_type (in/process/out)
+    # $2: file name
+    log_type="$1"
+    fname="$2"
+    log_path="$LOG_DIR/$(date +'%F')-${log_type}.log"
+    echo "$(date +'%T') $fname" >> "$log_path"
+}
 
 # ==== Hàm xử lý 1 file ====
 process_file() {
@@ -33,22 +39,23 @@ process_file() {
         number=$(echo "$base_name" | grep -oE '[0-9]+')
         new_name="$PROCESSED_DIR/processed-ABC-DT${number}-${HOSTNAME}.csv"
         mv "$file" "$new_name"
-        echo "$(date +'%F %T') [WORKER] Đã đổi tên: $base_name -> $(basename "$new_name")" >> "$LOG_PROCESS"
+        log_file "process" "$(basename "$new_name")"
     elif [[ "$base_name" == DT*.fin ]]; then
         number=$(echo "$base_name" | grep -oE '[0-9]+')
         new_name="$PROCESSED_DIR/processed-DT${number}.fin"
         mv "$file" "$new_name"
-        echo "$(date +'%F %T') [WORKER] Đã đổi tên: $base_name -> $(basename "$new_name")" >> "$LOG_PROCESS"
+        log_file "process" "$(basename "$new_name")"
     else
         mv "$file" "$OTHER_DIR/"
-        echo "$(date +'%F %T') [WORKER] Đã chuyển $base_name vào thư mục other" >> "$LOG_PROCESS"
+        log_file "process" "$base_name"
     fi
 }
 
 # ==== Worker pool ====
 worker_loop() {
     while true; do
-        file=$(find "$LOCAL_DEST" -maxdepth 1 -type f | head -n 1)
+        # Lọc chỉ các file thực (csv, fin), không pick .lock hay file lạ
+        file=$(find "$LOCAL_DEST" -maxdepth 1 -type f \( -name "*.csv" -o -name "*.fin" \) | head -n 1)
         if [ -n "$file" ]; then
             (
                 flock -n 200 || exit 1
@@ -64,21 +71,12 @@ worker_loop() {
 # ==== Luồng rsync lấy file về ====
 rsync_loop() {
     while true; do
-        echo "$(date +'%F %T') [RSYNC-IN] Bắt đầu đồng bộ file mới từ $REMOTE_HOST..." >> "$LOG_INPUT"
-        # Chạy rsync, chỉ lấy tên file vừa lấy về, log từng file riêng
         rsync -avz --remove-source-files --include="*.csv" --include="*.fin" --exclude="*" \
             "$REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR" "$LOCAL_DEST/" | \
-        grep -E "^receiving|^$|^\.\/" | \
-        grep -v '^receiving incremental file list' | \
-        grep -v '^sent ' | \
-        grep -v '^total size is ' | \
-        grep -v '^created directory' | \
-        grep -v '^$' | \
-        while read line; do
-            # Dòng bắt đầu ./ là tên file
+        grep -E "^\.\/" | grep -v '^created directory' | grep -v '^$' | while read line; do
             fname=$(echo "$line" | sed 's|^\./||')
             if [[ "$fname" != "" && "$fname" != "/" ]]; then
-                echo "$(date +'%F %T') [RSYNC-IN] Đã lấy: $fname" >> "$LOG_INPUT"
+                log_file "in" "$fname"
             fi
         done
         sleep $RSYNC_INTERVAL
@@ -88,19 +86,11 @@ rsync_loop() {
 # ==== Luồng đẩy file đã xử lý qua server khác ====
 push_loop() {
     while true; do
-        echo "$(date +'%F %T') [RSYNC-OUT] Bắt đầu đẩy file qua $DEST_HOST..." >> "$LOG_OUTPUT"
-        # Log các file thực sự đã đẩy thành công và xóa local (remove-source-files)
         rsync -avz --remove-source-files "$PROCESSED_DIR/" "$DEST_USER@$DEST_HOST:$DEST_DIR" | \
-        grep -E "^sending|^$|^\.\/" | \
-        grep -v '^sending incremental file list' | \
-        grep -v '^sent ' | \
-        grep -v '^total size is ' | \
-        grep -v '^created directory' | \
-        grep -v '^$' | \
-        while read line; do
+        grep -E "^\.\/" | grep -v '^created directory' | grep -v '^$' | while read line; do
             fname=$(echo "$line" | sed 's|^\./||')
             if [[ "$fname" != "" && "$fname" != "/" ]]; then
-                echo "$(date +'%F %T') [RSYNC-OUT] Đã đẩy: $fname" >> "$LOG_OUTPUT"
+                log_file "out" "$fname"
             fi
         done
         sleep $PUSH_INTERVAL
