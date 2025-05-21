@@ -92,9 +92,8 @@ rsync_loop() {
 # ========== RSYNC ĐẨY FILE ĐÃ XỬ LÝ RA VÀ GHI LOG OUT ==========
 push_loop() {
     while true; do
-        filelist=$(find "$PROCESSED_DIR" -type f -print0)
-        if [ -n "$filelist" ]; then
-            echo -n "$filelist" > /tmp/rsync_out.list
+        cd $REMOTE_DIR && find . -type f -mmin +1 -print0 > /tmp/rsync_out.list
+        if [ -s /tmp/rsync_out.list ]; then
             rsync -av --remove-source-files --files-from=/tmp/rsync_out.list --from0 "$PROCESSED_DIR" "$DEST_USER@$DEST_HOST:$DEST_DIR"
             while IFS= read -r -d '' fname; do
                 bname=$(basename "$fname")
