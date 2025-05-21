@@ -1,0 +1,139 @@
+rsync_loop() {
+    while true; do
+        # Tạo file list trên remote (tương đối so với $REMOTE_DIR)
+        ssh $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DIR && find . -type f -mmin +1 -print0" > /tmp/rsync_in.list
+        if [ -s /tmp/rsync_in.list ]; then
+            rsync -av --remove-source-files --files-from=/tmp/rsync_in.list --from0 $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR $LOCAL_DEST
+            while IFS= read -r -d '' fname; do
+                bname=$(basename "$fname")
+                log_in "$bname"
+            done < /tmp/rsync_in.list
+            rm -f /tmp/rsync_in.list
+        fi
+        sleep $RSYNC_INTERVAL
+    done
+}
+#!/bin/bash
+
+# ================== CẤU HÌNH ==================
+REMOTE_USER="wasadm"
+REMOTE_HOST="vn120158541"
+REMOTE_DIR="/appvol/tuan/files-in/"
+LOCAL_DEST="/Users/richard/Data/80/18/inwark-file"
+PROCESSED_DIR="/Users/richard/Data/80/18/process-file"
+OTHER_DIR="$PROCESSED_DIR/other"
+NUM_WORKERS=4
+RSYNC_INTERVAL=5
+HOSTNAME=$(hostname)
+
+# Cấu hình đẩy file đã xử lý đi
+DEST_USER="wasadm"
+DEST_HOST="vn120158542"
+DEST_DIR="/appvol/tuan/files-out/"
+PUSH_INTERVAL=5
+
+# Thư mục log
+LOG_DIR="/Users/richard/Data/80/18/log"
+mkdir -p "$LOCAL_DEST" "$PROCESSED_DIR" "$OTHER_DIR" "$LOG_DIR"
+
+# ========== HÀM GHI LOG ==========
+log_in() {
+    echo "$(date +'%T') $1" >> "$LOG_DIR/$(date +'%F')-in.log"
+}
+
+log_process() {
+    echo "$(date +'%T') $1" >> "$LOG_DIR/$(date +'%F')-process.log"
+}
+
+log_out() {
+    echo "$(date +'%T') $1" >> "$LOG_DIR/$(date +'%F')-out.log"
+}
+
+# ========== XỬ LÝ FILE ==========
+process_file() {
+    file="$1"
+    base_name=$(basename "$file")
+    if [[ "$base_name" == ABC-DT*.csv ]]; then
+        number=$(echo "$base_name" | grep -oE '[0-9]+')
+        new_name="$PROCESSED_DIR/processed-ABC-DT${number}-${HOSTNAME}.csv"
+        mv "$file" "$new_name"
+        log_process "$(basename "$new_name")"
+    elif [[ "$base_name" == DT*.fin ]]; then
+        number=$(echo "$base_name" | grep -oE '[0-9]+')
+        new_name="$PROCESSED_DIR/processed-DT${number}.fin"
+        mv "$file" "$new_name"
+        log_process "$(basename "$new_name")"
+    else
+        mv "$file" "$OTHER_DIR/"
+        log_process "$base_name"
+    fi
+}
+
+# ========== EXPORT HÀM CHO XARGS ==========
+export -f process_file
+export -f log_process
+export PROCESSED_DIR
+export OTHER_DIR
+export HOSTNAME
+export LOG_DIR
+
+# ========== WORKER POOL SỬ DỤNG XARGS ==========
+run_worker_pool() {
+    while true; do
+        find "$LOCAL_DEST" -maxdepth 1 \( -name "*.csv" -o -name "*.fin" \) -type f -mmin +0.5 -print0 | \
+        xargs -0 -P "$NUM_WORKERS" -I {} bash -c '
+            file="{}"
+            lockfile="$file.lock"
+            exec 200>"$lockfile"
+            if flock -n 200; then
+                if [ -f "$file" ]; then
+                    process_file "$file"
+                    rm -f "$lockfile"
+                fi
+                flock -u 200
+                exec 200>&-
+            fi
+        '
+        sleep 1
+    done
+}
+
+# ========== RSYNC LẤY FILE VỀ VÀ GHI LOG IN ==========
+rsync_loop() {
+    while true; do
+        # Lấy danh sách file trên remote (tương đối so với $REMOTE_DIR)
+        ssh $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DIR && find . -type f -mmin +1 -print0" > /tmp/rsync_in.list
+        if [ -s /tmp/rsync_in.list ]; then
+            rsync -av --remove-source-files --files-from=/tmp/rsync_in.list --from0 $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR $LOCAL_DEST
+            while IFS= read -r -d '' fname; do
+                bname=$(basename "$fname")
+                log_in "$bname"
+            done < /tmp/rsync_in.list
+            rm -f /tmp/rsync_in.list
+        fi
+        sleep $RSYNC_INTERVAL
+    done
+}
+
+# ========== RSYNC ĐẨY FILE ĐÃ XỬ LÝ RA VÀ GHI LOG OUT ==========
+push_loop() {
+    while true; do
+        find "$PROCESSED_DIR" -maxdepth 1 -type f -mmin +0.5 -print0 > /tmp/rsync_out.list
+        if [ -s /tmp/rsync_out.list ]; then
+            rsync -av --remove-source-files --files-from=/tmp/rsync_out.list --from0 "$PROCESSED_DIR" "$DEST_USER@$DEST_HOST:$DEST_DIR"
+            while IFS= read -r -d '' fname; do
+                bname=$(basename "$fname")
+                log_out "$bname"
+            done < /tmp/rsync_out.list
+            rm -f /tmp/rsync_out.list
+        fi
+        sleep $PUSH_INTERVAL
+    done
+}
+
+# ========== KHỞI ĐỘNG WORKER & CÁC LUỒNG ==========
+run_worker_pool &
+rsync_loop &
+push_loop &
+
+wait
