@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ======= CẤU HÌNH =======
+# ======================= CẤU HÌNH =======================
 REMOTE_USER="wasadm"
 REMOTE_HOST="vn120158541"
 REMOTE_DIR="/appvol/tuan/files-in/"
@@ -11,27 +11,27 @@ NUM_WORKERS=4
 RSYNC_INTERVAL=5
 HOSTNAME=$(hostname)
 
-# ======= Đẩy file đã xử lý sang server khác =======
+# Đẩy file đã xử lý sang server khác
 DEST_USER="wasadm"
 DEST_HOST="vn120158542"
 DEST_DIR="/appvol/tuan/files-out/"
 PUSH_INTERVAL=5
 
-# ======= LOG DIR =======
+# Thư mục log
 LOG_DIR="/Users/richard/Data/80/18/log"
 mkdir -p "$LOCAL_DEST" "$PROCESSED_DIR" "$OTHER_DIR" "$LOG_DIR"
 
-# ==== Hàm log tên file kèm giờ phút giây (chia file theo ngày) ====
+# ========== HÀM GHI LOG (chia theo ngày & loại log) ==========
 log_file() {
-    # $1: log_type (in/process/out)
-    # $2: file name
-    log_type="$1"
-    fname="$2"
-    log_path="$LOG_DIR/$(date +'%F')-${log_type}.log"
+    # $1 = loại log: in | process | out
+    # $2 = tên file
+    local log_type="$1"
+    local fname="$2"
+    local log_path="$LOG_DIR/$(date +'%F')-${log_type}.log"
     echo "$(date +'%T') $fname" >> "$log_path"
 }
 
-# ==== Hàm xử lý 1 file ====
+# ========== XỬ LÝ FILE ==========
 process_file() {
     file="$1"
     base_name=$(basename "$file")
@@ -51,10 +51,10 @@ process_file() {
     fi
 }
 
-# ==== Worker pool ====
+# ========== WORKER POOL ==========
 worker_loop() {
     while true; do
-        # Lọc chỉ các file thực (csv, fin), không pick .lock hay file lạ
+        # Chỉ lấy file .csv hoặc .fin (không lấy .lock, file lạ)
         file=$(find "$LOCAL_DEST" -maxdepth 1 -type f \( -name "*.csv" -o -name "*.fin" \) | head -n 1)
         if [ -n "$file" ]; then
             (
@@ -68,7 +68,7 @@ worker_loop() {
     done
 }
 
-# ==== Luồng rsync lấy file về ====
+# ========== RSYNC LẤY FILE VỀ ==========
 rsync_loop() {
     while true; do
         rsync -avz --remove-source-files --include="*.csv" --include="*.fin" --exclude="*" \
@@ -83,7 +83,7 @@ rsync_loop() {
     done
 }
 
-# ==== Luồng đẩy file đã xử lý qua server khác ====
+# ========== RSYNC ĐẨY FILE RA SERVER KHÁC ==========
 push_loop() {
     while true; do
         rsync -avz --remove-source-files "$PROCESSED_DIR/" "$DEST_USER@$DEST_HOST:$DEST_DIR" | \
@@ -97,7 +97,7 @@ push_loop() {
     done
 }
 
-# ==== Chạy các worker và các luồng đồng bộ song song ====
+# ========== KHỞI ĐỘNG WORKER & CÁC LUỒNG ==========
 for i in $(seq 1 $NUM_WORKERS); do
     worker_loop &
 done
