@@ -1,21 +1,18 @@
 #!/bin/bash
 # filepath: /path/to/check-pid.sh
 
-# Tên script cần kiểm tra
 PROCESS_NAME="processfile17.sh"
+SCRIPT_PATH="/Users/richard/Data/80/17/processfile17.sh"
 
-# Tìm tất cả PID của processfile17.sh
-PIDS=$(pgrep -f "$PROCESS_NAME")
-PROCESS_COUNT=$(echo "$PIDS" | wc -l)
+# Lấy PID của process, loại trừ PID chính script kiểm tra này
+PIDS=$(pgrep -f "$PROCESS_NAME" | grep -vw $$)
+PROCESS_COUNT=$(echo "$PIDS" | grep -c '[0-9]')
 
-if [ "$PROCESS_COUNT" -gt 5 ]; then
+if [ "$PROCESS_COUNT" -ge 5 ]; then
     echo "There are already $PROCESS_COUNT instances of $PROCESS_NAME running. Exiting script."
     exit 0
-elif [ -n "$PIDS" ]; then
-    echo "$PROCESS_NAME is already running with PIDs: $PIDS. Exiting script."
-    exit 0
 else
-    echo "$PROCESS_NAME is not running. Starting it..."
-    bash /Users/richard/Data/80/17/processfile17.sh &
+    echo "$PROCESS_NAME is running $PROCESS_COUNT instance(s). Starting one more..."
+    bash "$SCRIPT_PATH" &
     echo "$PROCESS_NAME has been started."
 fi
