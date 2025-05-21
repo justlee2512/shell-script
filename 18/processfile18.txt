@@ -26,13 +26,13 @@ rsync -avz --remove-source-files --include="*.csv" --include="*.fin" --exclude="
 # ==== BƯỚC 2: CHIA FILE VÀO CÁC SUBFOLDER (tự động, tránh lặp) ====
 echo "[2] Đang chia file vừa lấy về các part..."
 
-for file in "$LOCAL_DEST"/*; do
-    [ -f "$file" ] || continue
+find "$LOCAL_DEST" -maxdepth 1 -type f | while read file; do
     fname=$(basename "$file")
     hash=$(echo -n "$fname" | md5sum | cut -c1)
     part=$(( (0x$hash % NUM_PARTS) + 1 ))
     mv "$file" "$LOCAL_DEST/part$part/"
 done
+
 
 # ==== BƯỚC 3: ĐỊNH NGHĨA HÀM XỬ LÝ FILE TRONG 1 PART ====
 process_subfolder() {
