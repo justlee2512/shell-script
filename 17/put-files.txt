@@ -74,12 +74,10 @@ worker_loop() {
 # ========== RSYNC LẤY FILE VỀ VÀ GHI LOG IN ==========
 rsync_loop() {
     while true; do
-        # Lấy danh sách file trên remote (chỉ lấy file mới hơn 1 phút để tránh đụng file đang ghi)
-        filelist=$(ssh $REMOTE_USER@$REMOTE_HOST "find $REMOTE_DIR -type f -mmin +1 -print0")
-        if [ -n "$filelist" ]; then
-            echo -n "$filelist" > /tmp/rsync_in.list
+        # Tạo file list trên remote (tương đối so với $REMOTE_DIR)
+        ssh $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DIR && find . -type f -mmin +1 -print0" > /tmp/rsync_in.list
+        if [ -s /tmp/rsync_in.list ]; then
             rsync -av --remove-source-files --files-from=/tmp/rsync_in.list --from0 $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR $LOCAL_DEST
-            # Ghi log các file đã lấy về
             while IFS= read -r -d '' fname; do
                 bname=$(basename "$fname")
                 log_in "$bname"
@@ -89,6 +87,7 @@ rsync_loop() {
         sleep $RSYNC_INTERVAL
     done
 }
+
 
 # ========== RSYNC ĐẨY FILE ĐÃ XỬ LÝ RA VÀ GHI LOG OUT ==========
 push_loop() {
