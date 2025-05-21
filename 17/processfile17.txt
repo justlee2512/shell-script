@@ -1,50 +1,71 @@
 #!/bin/bash
+# file_processing_pipeline.sh
+# Author: ChatGPT - customized for your workflow
 
-# Định nghĩa các thư mục
-source_dir="/Users/richard/Data/80/files/so_le"
-destination_dir="/Users/richard/Data/80/18/inwark-file"
-proccessed_dir="/Users/richard/Data/80/18/process-file"
-other_dir="$proccessed_dir/other"
-hostname=$(hostname)
+# ---------------------- CONFIG ----------------------
+SOURCE_DIR="/Users/richard/Data/80/files/so_le"
+NUM_PARTS=5        # Số subfolder/process song song, có thể tăng/giảm
+DESTINATION_DIR="/Users/richard/Data/80/18/inwark-file"
+PROCESSED_DIR="/Users/richard/Data/80/18/process-file"
+OTHER_DIR="$PROCESSED_DIR/other"
+HOSTNAME=$(hostname)
 
-# Tạo thư mục đích nếu chưa tồn tại
-mkdir -p "$destination_dir"
-mkdir -p "$proccessed_dir"
-mkdir -p "$other_dir"
+# ----------------------------------------------------
+echo "Tạo các subfolder part1 ... part$NUM_PARTS"
+for i in $(seq 1 $NUM_PARTS); do
+    mkdir -p "$SOURCE_DIR/part$i"
+done
+mkdir -p "$DESTINATION_DIR"
+mkdir -p "$PROCESSED_DIR"
+mkdir -p "$OTHER_DIR"
 
-# Đồng bộ file từ thư mục số lẻ về thư mục inwark-file
-rsync -av --remove-source-files "$source_dir/" "$destination_dir/"
+# -------------- STEP 1: Chia file vào subfolder ---------------
+echo "Chia file vào các subfolder..."
 
-# Đổi tên file theo cấu trúc yêu cầu
-if [[ -z $(ls -A "$destination_dir") ]]; then
-    echo "Không có file trong $destination_dir. Dừng script."
-    bash check_pid.sh
-    exit 0
-fi
-
-for file in "$destination_dir"/*; do
-    if [[ -f "$file" ]]; then
-        base_name=$(basename "$file")
-        if [[ "$base_name" == ABC-DT*.csv ]]; then
-            # Đổi tên file ABC-DT${số}.csv
-            number=$(echo "$base_name" | grep -oE '[0-9]+')
-            new_name="$proccessed_dir/processed-ABC-DT${number}-${hostname}.csv"
-            mv "$file" "$new_name"
-            echo "Đã đổi tên: $base_name -> $(basename "$new_name")"
-        elif [[ "$base_name" == DT*.fin ]]; then
-            # Đổi tên file DT${số}.fin
-            number=$(echo "$base_name" | grep -oE '[0-9]+')
-            new_name="$proccessed_dir/processed-DT${number}.fin"
-            mv "$file" "$new_name"
-            echo "Đã đổi tên: $base_name -> $(basename "$new_name")"
-        else
-            # Nếu không khớp định dạng thì chuyển vào thư mục other
-            mv "$file" "$other_dir/"
-            echo "Đã chuyển $base_name vào thư mục other"
-        fi
-    fi
+# Chỉ chia những file nằm ngoài subfolder (tránh chia lặp)
+for file in "$SOURCE_DIR"/*; do
+    [ -f "$file" ] || continue
+    fname=$(basename "$file")
+    # Dùng hash để chia đều, tránh lặp lại với cùng tên file
+    hash=$(echo -n "$fname" | md5sum | cut -c1)
+    part=$(( (0x$hash % NUM_PARTS) + 1 ))
+    mv "$file" "$SOURCE_DIR/part$part/"
 done
 
-echo "Hoàn thành xử lý file!"
-bash check_pid.sh &
-exit 0
+# -------------- STEP 2: Định nghĩa function xử lý file ---------------
+process_subfolder() {
+    part_dir="$1"
+    for file in "$part_dir"/*; do
+        [ -f "$file" ] || continue
+        base_name=$(basename "$file")
+        if [[ "$base_name" == ABC-DT*.csv ]]; then
+            number=$(echo "$base_name" | grep -oE '[0-9]+')
+            new_name="$PROCESSED_DIR/processed-ABC-DT${number}-${HOSTNAME}.csv"
+            mv "$file" "$new_name"
+            echo "[$(basename "$part_dir")] Đã đổi tên: $base_name -> $(basename "$new_name")"
+        elif [[ "$base_name" == DT*.fin ]]; then
+            number=$(echo "$base_name" | grep -oE '[0-9]+')
+            new_name="$PROCESSED_DIR/processed-DT${number}.fin"
+            mv "$file" "$new_name"
+            echo "[$(basename "$part_dir")] Đã đổi tên: $base_name -> $(basename "$new_name")"
+        else
+            mv "$file" "$OTHER_DIR/"
+            echo "[$(basename "$part_dir")] Đã chuyển $base_name vào thư mục other"
+        fi
+    done
+}
+
+export -f process_subfolder
+export PROCESSED_DIR OTHER_DIR HOSTNAME
+
+# -------------- STEP 3: Chạy song song các process xử lý subfolder ---------------
+echo "Bắt đầu xử lý file song song..."
+
+for i in $(seq 1 $NUM_PARTS); do
+    part_path="$SOURCE_DIR/part$i"
+    bash -c "process_subfolder \"$part_path\"" &
+done
+
+wait  # Chờ tất cả process xong
+
+echo "Hoàn thành toàn bộ pipeline!"
