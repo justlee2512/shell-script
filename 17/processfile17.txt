@@ -7,9 +7,15 @@ REMOTE_DIR="/appvol/tuan/files-in/"
 LOCAL_DEST="/Users/richard/Data/80/18/inwark-file"
 PROCESSED_DIR="/Users/richard/Data/80/18/process-file"
 OTHER_DIR="$PROCESSED_DIR/other"
-NUM_WORKERS=4          # Số worker chạy song song
-RSYNC_INTERVAL=5       # Thời gian giữa các lần rsync (giây)
+NUM_WORKERS=4
+RSYNC_INTERVAL=5
 HOSTNAME=$(hostname)
+
+# ======= Đẩy file đã xử lý sang server khác =======
+DEST_USER="wasadm"
+DEST_HOST="vn120158542"
+DEST_DIR="/appvol/tuan/files-out/"
+PUSH_INTERVAL=5
 
 mkdir -p "$LOCAL_DEST" "$PROCESSED_DIR" "$OTHER_DIR"
 
@@ -36,7 +42,6 @@ process_file() {
 # ==== Worker pool ====
 worker_loop() {
     while true; do
-        # Lấy 1 file bất kỳ trong LOCAL_DEST
         file=$(find "$LOCAL_DEST" -maxdepth 1 -type f | head -n 1)
         if [ -n "$file" ]; then
             (
@@ -50,7 +55,7 @@ worker_loop() {
     done
 }
 
-# ==== Luồng rsync liên tục ====
+# ==== Luồng rsync lấy file về ====
 rsync_loop() {
     while true; do
         echo "[RSYNC] Đang đồng bộ file mới từ server $REMOTE_HOST..."
@@ -60,14 +65,21 @@ rsync_loop() {
     done
 }
 
-# ==== Chạy các worker và rsync song song ====
-# Worker pool
+# ==== Luồng đẩy file đã xử lý qua server khác ====
+push_loop() {
+    while true; do
+        echo "[PUSH] Đang đẩy file đã xử lý qua $DEST_HOST..."
+        rsync -avz --remove-source-files "$PROCESSED_DIR/" "$DEST_USER@$DEST_HOST:$DEST_DIR"
+        sleep $PUSH_INTERVAL
+    done
+}
+
+# ==== Chạy các worker và các luồng đồng bộ song song ====
 for i in $(seq 1 $NUM_WORKERS); do
     worker_loop &
 done
 
-# Rsync liên tục
 rsync_loop &
+push_loop &
 
-# Đợi tất cả process
 wait
