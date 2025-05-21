@@ -59,7 +59,16 @@ process_file() {
 worker_loop() {
     while true; do
         for file in "$LOCAL_DEST"/*.csv "$LOCAL_DEST"/*.fin; do
-            [ -e "$file" ] || { sleep 2; continue; }
+            [ -e "$file" ] || continue
+
+            # Chỉ xử lý file đã tồn tại trên 30 giây
+            mtime=$(stat -c "%Y" "$file")
+            now=$(date +%s)
+            age=$(( now - mtime ))
+            if (( age < 30 )); then
+                continue
+            fi
+
             exec 200>"$file.lock"
             if flock -n 200; then
                 if [ -f "$file" ]; then
@@ -77,6 +86,7 @@ worker_loop() {
         sleep 1
     done
 }
+
 
 # ========== RSYNC LẤY FILE VỀ VÀ GHI LOG IN ==========
 rsync_loop() {
