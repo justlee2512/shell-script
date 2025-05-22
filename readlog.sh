@@ -39,25 +39,21 @@ choose_date() {
     fi
 }
 
-# ===== CHỌN FILE LOG (RÕ RÀNG) =====
+# ===== CHỌN FILE LOG =====
 choose_log_file() {
-    echo ""
-    echo "===== CHỌN FILE LOG ====="
-    echo "1) log-in.log      ($LOG_IN)"
-    echo "2) log-out.log     ($LOG_OUT)"
-    echo "3) log-process.log ($LOG_PROCESS)"
-    echo "========================="
     read -p "🔢 Nhập số tương ứng (1:log-in, 2:log-out, 3:log-process): " log_choice
 
     case "$log_choice" in
-        1) echo "$LOG_IN" ;;
-        2) echo "$LOG_OUT" ;;
-        3) echo "$LOG_PROCESS" ;;
-        *) echo "none" ;;
+        1) log_file="$LOG_IN" ;;
+        2) log_file="$LOG_OUT" ;;
+        3) log_file="$LOG_PROCESS" ;;
+        *) log_file="none" ;;
     esac
+
+    echo "$log_file"
 }
 
-# ===== BẮT ĐẦU: CHỌN NGÀY LOG =====
+# ===== BẮT BUỘC CHỌN NGÀY BAN ĐẦU =====
 echo "===== CHỌN NGÀY LOG ====="
 choose_date
 
@@ -75,6 +71,12 @@ while true; do
 
     case "$choice" in
         1)
+            echo ""
+            echo "===== CHỌN FILE LOG ====="
+            echo "1) log-in.log      ($LOG_IN)"
+            echo "2) log-out.log     ($LOG_OUT)"
+            echo "3) log-process.log ($LOG_PROCESS)"
+            echo "========================="
             log_file=$(choose_log_file)
             if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
                 echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
@@ -83,6 +85,12 @@ while true; do
             fi
             ;;
         2)
+            echo ""
+            echo "===== CHỌN FILE LOG ====="
+            echo "1) log-in.log      ($LOG_IN)"
+            echo "2) log-out.log     ($LOG_OUT)"
+            echo "3) log-process.log ($LOG_PROCESS)"
+            echo "========================="
             log_file=$(choose_log_file)
             if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
                 echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
