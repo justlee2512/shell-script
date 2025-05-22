@@ -3,19 +3,22 @@
 # ===== THƯ MỤC CHỨA LOG NGÀY =====
 BASE_DIR="/a/b/c/log"
 selected_date=""
+LOG_DIR=""
+LOG_IN=""
+LOG_OUT=""
+LOG_PROCESS=""
 
-# ===== CHỌN NGÀY TỪ DANH SÁCH THƯ MỤC =====
+# ===== CHỌN NGÀY LOG TRƯỚC =====
 choose_date() {
     echo ""
     echo "🔍 Đang tìm các thư mục log trong $BASE_DIR..."
 
-    # Tìm thư mục có định dạng ngày yyyyddMM
+    # Tìm thư mục định dạng yyyyddMM
     available_dates=($(find "$BASE_DIR" -maxdepth 1 -type d -printf "%f\n" | grep -E '^[0-9]{8}$' | sort -r | head -n 10))
 
     if [[ ${#available_dates[@]} -eq 0 ]]; then
         echo "❌ Không tìm thấy thư mục ngày nào trong $BASE_DIR"
-        selected_date=""
-        return
+        exit 1
     fi
 
     echo "🗂️  Các ngày log gần nhất:"
@@ -33,8 +36,8 @@ choose_date() {
         LOG_PROCESS="$LOG_DIR/log_process.txt"
         echo "✅ Đã chọn thư mục log: $LOG_DIR"
     else
-        echo "❌ Lựa chọn không hợp lệ."
-        selected_date=""
+        echo "❌ Lựa chọn không hợp lệ. Thoát chương trình."
+        exit 1
     fi
 }
 
@@ -55,27 +58,23 @@ choose_log_file() {
     esac
 }
 
-# ===== MENU CHÍNH =====
+# ===== BẮT BUỘC CHỌN NGÀY TRƯỚC =====
+echo "===== CHỌN NGÀY LOG ====="
+choose_date
+
+# ===== VÒNG LẶP MENU =====
 while true; do
     echo ""
     echo "===== MENU CHÍNH ====="
-    echo "1) Chọn ngày log"
-    echo "2) Đếm số dòng trong log"
-    echo "3) Tìm kiếm tên file trong log"
-    echo "4) So sánh tên file giữa log_in và log_process"
+    echo "1) Đếm số dòng trong log"
+    echo "2) Tìm kiếm tên file trong log"
+    echo "3) So sánh tên file giữa log_in và log_process"
     echo "0) Thoát"
     echo "======================"
-    read -p "Chọn một tùy chọn (0-4): " choice
+    read -p "Chọn một tùy chọn (0-3): " choice
 
     case "$choice" in
         1)
-            choose_date
-            ;;
-        2)
-            if [[ -z "$selected_date" ]]; then
-                echo "⚠️ Vui lòng chọn ngày log trước (option 1)."
-                continue
-            fi
             log_file=$(choose_log_file)
             if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
                 echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
@@ -83,11 +82,7 @@ while true; do
                 echo "✅ Số dòng trong $log_file: $(wc -l < "$log_file") dòng"
             fi
             ;;
-        3)
-            if [[ -z "$selected_date" ]]; then
-                echo "⚠️ Vui lòng chọn ngày log trước (option 1)."
-                continue
-            fi
+        2)
             log_file=$(choose_log_file)
             if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
                 echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
@@ -97,11 +92,7 @@ while true; do
                 grep --color=always "$keyword" "$log_file" || echo "Không tìm thấy."
             fi
             ;;
-        4)
-            if [[ -z "$selected_date" ]]; then
-                echo "⚠️ Vui lòng chọn ngày log trước (option 1)."
-                continue
-            fi
+        3)
             if [[ ! -f "$LOG_IN" || ! -f "$LOG_PROCESS" ]]; then
                 echo "❌ Thiếu log_in.txt hoặc log_process.txt!"
                 continue
@@ -109,7 +100,6 @@ while true; do
 
             echo "🔍 So sánh tên file giữa log_in và log_process..."
 
-            # Cột thứ 2 là tên file, bỏ tiền tố "processed-" nếu có
             awk '{print $2}' "$LOG_IN" | sort | uniq > /tmp/in_files.txt
             awk '{print $2}' "$LOG_PROCESS" | sed 's/^processed-//' | sort | uniq > /tmp/process_files.txt
 
