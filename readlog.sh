@@ -63,7 +63,7 @@ while true; do
     echo "===== MENU CHÍNH (Ngày: $selected_date) ====="
     echo "1) Đếm số dòng trong log"
     echo "2) Tìm kiếm tên file trong log"
-    echo "3) So sánh tên file giữa log-in và log-process"
+    echo "3) So sánh file (.csv & .fin) giữa log-in và log-process"
     echo "4) 🔁 Chọn lại ngày log"
     echo "0) Thoát"
     echo "============================================="
@@ -106,16 +106,16 @@ while true; do
                 continue
             fi
 
-            echo "🔍 So sánh tên file giữa log-in và log-process..."
+            echo "🔍 So sánh file (.csv và .fin) giữa log-in và log-process..."
 
-            awk '{print $2}' "$LOG_IN" | sort | uniq > /tmp/in_files.txt
-            awk '{print $2}' "$LOG_PROCESS" | sed 's/^processed-//' | sort | uniq > /tmp/process_files.txt
+            awk '{print $2}' "$LOG_IN" | grep -E '\.csv$|\.fin$' | sort | uniq > /tmp/in_files.txt
+            awk '{print $2}' "$LOG_PROCESS" | sed 's/^processed-//' | grep -E '\.csv$|\.fin$' | sort | uniq > /tmp/process_files.txt
 
             DIFF_OUTPUT="./diff_result_$selected_date.txt"
             comm -23 /tmp/in_files.txt /tmp/process_files.txt > "$DIFF_OUTPUT"
 
-            echo "✅ Đã lưu file khác biệt: $DIFF_OUTPUT"
-            echo "✅ Số file khác nhau: $(wc -l < "$DIFF_OUTPUT")"
+            echo "✅ Đã lưu các file khác biệt vào: $DIFF_OUTPUT"
+            echo "✅ Tổng số file khác biệt: $(wc -l < "$DIFF_OUTPUT")"
             ;;
         4)
             choose_date
