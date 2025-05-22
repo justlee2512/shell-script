@@ -39,14 +39,15 @@ choose_date() {
     fi
 }
 
-# ===== CHỌN FILE LOG (CÓ NHÃN RÕ RÀNG) =====
+# ===== CHỌN FILE LOG (RÕ RÀNG) =====
 choose_log_file() {
     echo ""
-    echo "Chọn file log muốn thao tác:"
+    echo "===== CHỌN FILE LOG ====="
     echo "1) log-in.log      ($LOG_IN)"
     echo "2) log-out.log     ($LOG_OUT)"
     echo "3) log-process.log ($LOG_PROCESS)"
-    read -p "Nhập số (1-3): " log_choice
+    echo "========================="
+    read -p "🔢 Nhập số tương ứng (1:log-in, 2:log-out, 3:log-process): " log_choice
 
     case "$log_choice" in
         1) echo "$LOG_IN" ;;
@@ -56,7 +57,7 @@ choose_log_file() {
     esac
 }
 
-# ===== BẮT BUỘC CHỌN NGÀY NGAY BAN ĐẦU =====
+# ===== BẮT ĐẦU: CHỌN NGÀY LOG =====
 echo "===== CHỌN NGÀY LOG ====="
 choose_date
 
@@ -78,7 +79,7 @@ while true; do
             if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
                 echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
             else
-                echo "✅ Số dòng trong $log_file: $(wc -l < "$log_file") dòng"
+                echo "✅ Số dòng trong $(basename "$log_file"): $(wc -l < "$log_file") dòng"
             fi
             ;;
         2)
@@ -87,7 +88,7 @@ while true; do
                 echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
             else
                 read -p "Nhập từ khóa cần tìm: " keyword
-                echo "📂 Kết quả tìm '$keyword' trong $log_file:"
+                echo "📂 Kết quả tìm '$keyword' trong $(basename "$log_file"):"
                 grep --color=always "$keyword" "$log_file" || echo "⚠️ Không tìm thấy!"
             fi
             ;;
