@@ -82,7 +82,7 @@ run_worker_pool() {
 # ========== RSYNC LẤY FILE VỀ VÀ GHI LOG IN ==========
 rsync_loop() {
     while true; do
-        ssh $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DIR && find . -type f -mmin +1 -print0" > /tmp/rsync_in.list
+        ssh $REMOTE_USER@$REMOTE_HOST "cd $REMOTE_DIR && find . -type f -mmin +1 | head -n 1000" | tr '\n' '\0' > /tmp/rsync_in.list
         if [ -s /tmp/rsync_in.list ]; then
             rsync -av --remove-source-files --files-from=/tmp/rsync_in.list --from0 $REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR $LOCAL_DEST
             while IFS= read -r -d '' fname; do
@@ -98,7 +98,7 @@ rsync_loop() {
 # ========== RSYNC ĐẨY FILE ĐÃ XỬ LÝ RA VÀ GHI LOG OUT ==========
 push_loop() {
     while true; do
-        find "$PROCESSED_DIR" -maxdepth 1 -type f -mmin +0.5 -print0 > /tmp/rsync_out.list
+        find "$PROCESSED_DIR" -maxdepth 1 -type f -mmin +0.5 | head -n 1000 | tr '\n' '\0' > /tmp/rsync_out.list
         if [ -s /tmp/rsync_out.list ]; then
             rsync -av --remove-source-files --files-from=/tmp/rsync_out.list --from0 "$PROCESSED_DIR" "$DEST_USER@$DEST_HOST:$DEST_DIR"
             while IFS= read -r -d '' fname; do
