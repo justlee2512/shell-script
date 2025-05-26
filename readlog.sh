@@ -64,10 +64,11 @@ while true; do
     echo "1) Đếm số dòng trong log"
     echo "2) Tìm kiếm tên file trong log"
     echo "3) So sánh mã file (.csv & .fin) giữa log-in và log-process"
-    echo "4) 🔁 Chọn lại ngày log"
+    echo "4) Kiểm tra file trùng trong log-out.log"
+    echo "5) 🔁 Chọn lại ngày log"
     echo "0) Thoát"
     echo "============================================="
-    read -p "Chọn một tùy chọn (0-4): " choice
+    read -p "Chọn một tùy chọn (0-5): " choice
 
     case "$choice" in
         1)
@@ -149,8 +150,37 @@ while true; do
             echo "✅ Các file khác chỉ có trong log-in: $OTHERS_IN_ONLY (số lượng: $(wc -l < "$OTHERS_IN_ONLY"))"
             echo "✅ Các file khác chỉ có trong log-process: $OTHERS_PROCESS_ONLY (số lượng: $(wc -l < "$OTHERS_PROCESS_ONLY"))"
             ;;
-
         4)
+            if [[ ! -f "$LOG_OUT" ]]; then
+                echo "❌ log-out.log không tồn tại!"
+                continue
+            fi
+
+            echo "🔍 Đang kiểm tra file trùng trong log-out.log..."
+
+            # Kiểm tra trùng file .csv (đúng mẫu processed-ABC-DTxxxxx.csv)
+            awk '{print $2}' "$LOG_OUT" | grep -E '^processed-ABC-DT[0-9]+\.csv$' | sort | uniq -d > ./dup_csv_out_$selected_date.txt
+
+            # Kiểm tra trùng file .fin (đúng mẫu processed-DTxxxxx.fin)
+            awk '{print $2}' "$LOG_OUT" | grep -E '^processed-DT[0-9]+\.fin$' | sort | uniq -d > ./dup_fin_out_$selected_date.txt
+
+            if [[ -s ./dup_csv_out_$selected_date.txt ]]; then
+                echo "⚠️ Các file .csv trùng:"
+                cat ./dup_csv_out_$selected_date.txt
+                echo "✅ Danh sách file .csv trùng đã lưu ở ./dup_csv_out_$selected_date.txt"
+            else
+                echo "✅ Không phát hiện file .csv nào bị trùng!"
+            fi
+
+            if [[ -s ./dup_fin_out_$selected_date.txt ]]; then
+                echo "⚠️ Các file .fin trùng:"
+                cat ./dup_fin_out_$selected_date.txt
+                echo "✅ Danh sách file .fin trùng đã lưu ở ./dup_fin_out_$selected_date.txt"
+            else
+                echo "✅ Không phát hiện file .fin nào bị trùng!"
+            fi
+            ;;
+        5)
             choose_date
             ;;
         0)
