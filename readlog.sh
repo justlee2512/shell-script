@@ -108,6 +108,7 @@ while true; do
 
             echo "🔍 So sánh mã DTxxxxx giữa log-in và log-process..."
 
+            # --------- So sánh mã DTxxxx ----------
             awk '{print $2}' "$LOG_IN" \
                 | grep -E '\.csv$|\.fin$' \
                 | grep -oE 'DT[0-9]+' \
@@ -124,7 +125,31 @@ while true; do
 
             echo "✅ Đã lưu các mã DT chưa xử lý vào: $DIFF_OUTPUT"
             echo "✅ Tổng số mã DT khác biệt: $(wc -l < "$DIFF_OUTPUT")"
+
+            # --------- So sánh FILE KHÁC ----------
+            # Lấy tên file log-in (không tiền tố processed-)
+            awk '{print $2}' "$LOG_IN" \
+                | grep -E '\.csv$|\.fin$' \
+                | grep -vE 'DT[0-9]+' \
+                | sort -u > /tmp/in_others.txt
+
+            # Lấy tên file log-process (bỏ processed-)
+            awk '{print $2}' "$LOG_PROCESS" \
+                | sed 's/^processed-//' \
+                | grep -E '\.csv$|\.fin$' \
+                | grep -vE 'DT[0-9]+' \
+                | sort -u > /tmp/process_others.txt
+
+            OTHERS_IN_ONLY="./others_in_only_$selected_date.txt"
+            OTHERS_PROCESS_ONLY="./others_process_only_$selected_date.txt"
+
+            comm -23 /tmp/in_others.txt /tmp/process_others.txt > "$OTHERS_IN_ONLY"
+            comm -13 /tmp/in_others.txt /tmp/process_others.txt > "$OTHERS_PROCESS_ONLY"
+
+            echo "✅ Các file khác chỉ có trong log-in: $OTHERS_IN_ONLY (số lượng: $(wc -l < "$OTHERS_IN_ONLY"))"
+            echo "✅ Các file khác chỉ có trong log-process: $OTHERS_PROCESS_ONLY (số lượng: $(wc -l < "$OTHERS_PROCESS_ONLY"))"
             ;;
+
         4)
             choose_date
             ;;
