@@ -22,9 +22,21 @@ LOG_DIR="/Users/richard/Data/80/18/log"
 mkdir -p "$LOCAL_DEST" "$PROCESSED_DIR" "$OTHER_DIR" "$LOG_DIR"
 
 # ========== HÀM GHI LOG ==========
-log_in()      { echo "$(date +'%T') $1" >> "$LOG_DIR/$(date +'%F')-in.log"; }
-log_process() { echo "$(date +'%T') $1" >> "$LOG_DIR/$(date +'%F')-process.log"; }
-log_out()     { echo "$(date +'%T') $1" >> "$LOG_DIR/$(date +'%F')-out.log"; }
+log_in() {
+    log_date=$(date +'%Y%d%m')
+    mkdir -p "$LOG_DIR/$log_date"
+    echo "$(date +'%T') $1" >> "$LOG_DIR/$log_date/in.log"
+}
+log_process() {
+    log_date=$(date +'%Y%d%m')
+    mkdir -p "$LOG_DIR/$log_date"
+    echo "$(date +'%T') $1" >> "$LOG_DIR/$log_date/process.log"
+}
+log_out() {
+    log_date=$(date +'%Y%d%m')
+    mkdir -p "$LOG_DIR/$log_date"
+    echo "$(date +'%T') $1" >> "$LOG_DIR/$log_date/out.log"
+}
 
 # ========== XỬ LÝ FILE ==========
 process_file() {
