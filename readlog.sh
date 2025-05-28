@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# Color definitions
+BLUE="\e[96m"
+YELLOW="\e[93m"
+RED="\e[91m"
+GREEN="\e[92m"
+GRAY="\e[37m"
+BOLD="\e[1m"
+RESET="\e[0m"
+CYAN="\e[36m"
+
+LINE="------------------------------------------------------------"
+
 BASE_DIR="/a/b/c/log"
 selected_date=""
 LOG_DIR=""
@@ -7,24 +19,34 @@ LOG_IN=""
 LOG_OUT=""
 LOG_PROCESS=""
 
-# ===== CHỌN NGÀY LOG =====
+print_menu_border() {
+    echo -e "${CYAN}${LINE}${RESET}"
+}
+
+print_section_title() {
+    print_menu_border
+    echo -e "${BOLD}${BLUE}$1${RESET}"
+    print_menu_border
+}
+
 choose_date() {
-    echo ""
-    echo "🔍 Đang tìm thư mục log trong $BASE_DIR..."
+    print_section_title "SELECT LOG DATE"
+    echo -e "${BLUE}Scanning log folders in $BASE_DIR ...${RESET}"
 
     available_dates=($(find "$BASE_DIR" -maxdepth 1 -type d -printf "%f\n" | grep -E '^[0-9]{8}$' | sort -r | head -n 10))
 
     if [[ ${#available_dates[@]} -eq 0 ]]; then
-        echo "❌ Không có thư mục log hợp lệ trong $BASE_DIR"
+        echo -e "${RED}No valid log folders found in $BASE_DIR.${RESET}"
         exit 1
     fi
 
-    echo "🗂️  Các ngày log gần nhất:"
+    echo -e "${YELLOW}Recent log dates:${RESET}"
     for i in "${!available_dates[@]}"; do
-        echo "$((i+1))) ${available_dates[$i]}"
+        printf "  %2d) %s\n" $((i+1)) "${available_dates[$i]}"
     done
+    print_menu_border
 
-    read -p "🔢 Chọn số tương ứng (1-${#available_dates[@]}): " day_choice
+    read -p "Select a date by number (1-${#available_dates[@]}): " day_choice
 
     if [[ "$day_choice" =~ ^[0-9]+$ ]] && (( day_choice >= 1 && day_choice <= ${#available_dates[@]} )); then
         selected_date="${available_dates[$((day_choice-1))]}"
@@ -32,16 +54,21 @@ choose_date() {
         LOG_IN="$LOG_DIR/log-in.log"
         LOG_OUT="$LOG_DIR/log-out.log"
         LOG_PROCESS="$LOG_DIR/log-process.log"
-        echo "✅ Đã chọn: $LOG_DIR"
+        echo -e "${GREEN}Selected log date: $selected_date${RESET}"
     else
-        echo "❌ Lựa chọn không hợp lệ. Thoát."
+        echo -e "${RED}Invalid selection. Exiting.${RESET}"
         exit 1
     fi
 }
 
-# ===== CHỌN FILE LOG =====
 choose_log_file() {
-    read -p "🔢 Nhập số tương ứng (1:log-in, 2:log-out, 3:log-process): " log_choice
+    print_menu_border
+    echo -e "${BLUE}Select a log file:${RESET}"
+    echo "  1) log-in.log      ($LOG_IN)"
+    echo "  2) log-out.log     ($LOG_OUT)"
+    echo "  3) log-process.log ($LOG_PROCESS)"
+    print_menu_border
+    read -p "Enter choice (1/2/3): " log_choice
 
     case "$log_choice" in
         1) log_file="$LOG_IN" ;;
@@ -53,142 +80,167 @@ choose_log_file() {
     echo "$log_file"
 }
 
-# ===== BẮT BUỘC CHỌN NGÀY BAN ĐẦU =====
-echo "===== CHỌN NGÀY LOG ====="
+# Forced log date selection at start
 choose_date
 
-# ===== MENU CHÍNH =====
 while true; do
-    echo ""
-    echo "===== MENU CHÍNH (Ngày: $selected_date) ====="
-    echo "1) Đếm số dòng trong log"
-    echo "2) Tìm kiếm tên file trong log"
-    echo "3) So sánh mã file (.csv & .fin) giữa log-in và log-process"
-    echo "4) Kiểm tra file trùng trong log-out.log"
-    echo "5) 🔁 Chọn lại ngày log"
-    echo "0) Thoát"
-    echo "============================================="
-    read -p "Chọn một tùy chọn (0-5): " choice
+    print_section_title "MAIN MENU"
+    echo -e "Current log date: ${YELLOW}$selected_date${RESET}"
+    echo -e "${BOLD}  1)${RESET} Count lines in log"
+    echo -e "${BOLD}  2)${RESET} Search file name in log"
+    echo -e "${BOLD}  3)${RESET} Compare codes (.csv & .fin) between log-in and log-process"
+    echo -e "${BOLD}  4)${RESET} Check for duplicate files in log-out.log"
+    echo -e "${BOLD}  5)${RESET} Change log date"
+    echo -e "${BOLD}  0)${RESET} Exit"
+    print_menu_border
+    read -p "Select an option (0-5): " choice
 
     case "$choice" in
         1)
-            echo ""
-            echo "===== CHỌN FILE LOG ====="
-            echo "1) log-in.log      ($LOG_IN)"
-            echo "2) log-out.log     ($LOG_OUT)"
-            echo "3) log-process.log ($LOG_PROCESS)"
-            echo "========================="
-            log_file=$(choose_log_file)
-            if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
-                echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
-            else
-                echo "✅ Số dòng trong $(basename "$log_file"): $(wc -l < "$log_file") dòng"
-            fi
+            while true; do
+                log_file=$(choose_log_file)
+                if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
+                    echo -e "${RED}Invalid selection or file does not exist!${RESET}"
+                else
+                    print_menu_border
+                    echo -e "${GREEN}$(basename "$log_file") has $(wc -l < "$log_file") lines.${RESET}"
+                    print_menu_border
+                fi
+                echo -e "${GRAY}Press [Enter] to count another file, or type 'q' to return to main menu...${RESET}"
+                read back
+                [[ "$back" == "q" || "$back" == "Q" ]] && break
+            done
             ;;
         2)
-            echo ""
-            echo "===== CHỌN FILE LOG ====="
-            echo "1) log-in.log      ($LOG_IN)"
-            echo "2) log-out.log     ($LOG_OUT)"
-            echo "3) log-process.log ($LOG_PROCESS)"
-            echo "========================="
-            log_file=$(choose_log_file)
-            if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
-                echo "❌ Lựa chọn không hợp lệ hoặc file không tồn tại!"
-            else
-                read -p "Nhập từ khóa cần tìm: " keyword
-                echo "📂 Kết quả tìm '$keyword' trong $(basename "$log_file"):"
-                grep --color=always "$keyword" "$log_file" || echo "⚠️ Không tìm thấy!"
-            fi
+            while true; do
+                log_file=$(choose_log_file)
+                if [[ "$log_file" == "none" || ! -f "$log_file" ]]; then
+                    echo -e "${RED}Invalid selection or file does not exist!${RESET}"
+                else
+                    read -p "Enter keyword to search: " keyword
+                    print_menu_border
+                    echo -e "${BOLD}${BLUE}Search results for '$keyword' in $(basename "$log_file"):${RESET}"
+                    print_menu_border
+                    found=0
+                    while IFS= read -r line; do
+                        if [[ "$line" == *"$keyword"* ]]; then
+                            found=1
+                            # Highlight the keyword in yellow
+                            highlight=$(echo "$line" | sed "s/$keyword/${YELLOW}${BOLD}${keyword}${RESET}${BLUE}/g")
+                            echo -e "${YELLOW}$highlight${RESET}"
+                        fi
+                    done < "$log_file"
+                    if [[ $found -eq 0 ]]; then
+                        echo -e "${YELLOW}No results found.${RESET}"
+                    fi
+                    print_menu_border
+                fi
+                echo -e "${GRAY}Press [Enter] to search again, or type 'q' to return to main menu...${RESET}"
+                read back
+                [[ "$back" == "q" || "$back" == "Q" ]] && break
+            done
             ;;
         3)
-            if [[ ! -f "$LOG_IN" || ! -f "$LOG_PROCESS" ]]; then
-                echo "❌ Thiếu log-in.log hoặc log-process.log!"
-                continue
-            fi
+            while true; do
+                if [[ ! -f "$LOG_IN" || ! -f "$LOG_PROCESS" ]]; then
+                    echo -e "${RED}log-in.log or log-process.log not found!${RESET}"
+                else
+                    print_section_title "COMPARING DTxxxxx CODES"
+                    # Compare DT codes
+                    awk '{print $2}' "$LOG_IN" \
+                        | grep -E '\.csv$|\.fin$' \
+                        | grep -oE 'DT[0-9]+' \
+                        | sort -u > /tmp/in_codes.txt
 
-            echo "🔍 So sánh mã DTxxxxx giữa log-in và log-process..."
+                    awk '{print $2}' "$LOG_PROCESS" \
+                        | sed 's/^processed-//' \
+                        | grep -E '\.csv$|\.fin$' \
+                        | grep -oE 'DT[0-9]+' \
+                        | sort -u > /tmp/process_codes.txt
 
-            # --------- So sánh mã DTxxxx ----------
-            awk '{print $2}' "$LOG_IN" \
-                | grep -E '\.csv$|\.fin$' \
-                | grep -oE 'DT[0-9]+' \
-                | sort -u > /tmp/in_codes.txt
+                    DIFF_OUTPUT="./diff_result_$selected_date.txt"
+                    comm -23 /tmp/in_codes.txt /tmp/process_codes.txt > "$DIFF_OUTPUT"
 
-            awk '{print $2}' "$LOG_PROCESS" \
-                | sed 's/^processed-//' \
-                | grep -E '\.csv$|\.fin$' \
-                | grep -oE 'DT[0-9]+' \
-                | sort -u > /tmp/process_codes.txt
+                    echo -e "${GREEN}Unprocessed DT codes saved in: $DIFF_OUTPUT${RESET}"
+                    echo -e "${GREEN}Number of missing codes: $(wc -l < "$DIFF_OUTPUT")${RESET}"
 
-            DIFF_OUTPUT="./diff_result_$selected_date.txt"
-            comm -23 /tmp/in_codes.txt /tmp/process_codes.txt > "$DIFF_OUTPUT"
+                    # Compare OTHER files
+                    awk '{print $2}' "$LOG_IN" \
+                        | grep -E '\.csv$|\.fin$' \
+                        | grep -vE 'DT[0-9]+' \
+                        | sort -u > /tmp/in_others.txt
 
-            echo "✅ Đã lưu các mã DT chưa xử lý vào: $DIFF_OUTPUT"
-            echo "✅ Tổng số mã DT khác biệt: $(wc -l < "$DIFF_OUTPUT")"
+                    awk '{print $2}' "$LOG_PROCESS" \
+                        | sed 's/^processed-//' \
+                        | grep -E '\.csv$|\.fin$' \
+                        | grep -vE 'DT[0-9]+' \
+                        | sort -u > /tmp/process_others.txt
 
-            # --------- So sánh FILE KHÁC ----------
-            # Lấy tên file log-in (không tiền tố processed-)
-            awk '{print $2}' "$LOG_IN" \
-                | grep -E '\.csv$|\.fin$' \
-                | grep -vE 'DT[0-9]+' \
-                | sort -u > /tmp/in_others.txt
+                    OTHERS_IN_ONLY="./others_in_only_$selected_date.txt"
+                    OTHERS_PROCESS_ONLY="./others_process_only_$selected_date.txt"
 
-            # Lấy tên file log-process (bỏ processed-)
-            awk '{print $2}' "$LOG_PROCESS" \
-                | sed 's/^processed-//' \
-                | grep -E '\.csv$|\.fin$' \
-                | grep -vE 'DT[0-9]+' \
-                | sort -u > /tmp/process_others.txt
+                    comm -23 /tmp/in_others.txt /tmp/process_others.txt > "$OTHERS_IN_ONLY"
+                    comm -13 /tmp/in_others.txt /tmp/process_others.txt > "$OTHERS_PROCESS_ONLY"
 
-            OTHERS_IN_ONLY="./others_in_only_$selected_date.txt"
-            OTHERS_PROCESS_ONLY="./others_process_only_$selected_date.txt"
-
-            comm -23 /tmp/in_others.txt /tmp/process_others.txt > "$OTHERS_IN_ONLY"
-            comm -13 /tmp/in_others.txt /tmp/process_others.txt > "$OTHERS_PROCESS_ONLY"
-
-            echo "✅ Các file khác chỉ có trong log-in: $OTHERS_IN_ONLY (số lượng: $(wc -l < "$OTHERS_IN_ONLY"))"
-            echo "✅ Các file khác chỉ có trong log-process: $OTHERS_PROCESS_ONLY (số lượng: $(wc -l < "$OTHERS_PROCESS_ONLY"))"
+                    echo -e "${YELLOW}Files (not DT code) only in log-in: $OTHERS_IN_ONLY ($(wc -l < "$OTHERS_IN_ONLY"))${RESET}"
+                    echo -e "${YELLOW}Files (not DT code) only in log-process: $OTHERS_PROCESS_ONLY ($(wc -l < "$OTHERS_PROCESS_ONLY"))${RESET}"
+                    print_menu_border
+                fi
+                echo -e "${GRAY}Press [Enter] to compare again, or type 'q' to return to main menu...${RESET}"
+                read back
+                [[ "$back" == "q" || "$back" == "Q" ]] && break
+            done
             ;;
         4)
-            if [[ ! -f "$LOG_OUT" ]]; then
-                echo "❌ log-out.log không tồn tại!"
-                continue
-            fi
+            while true; do
+                if [[ ! -f "$LOG_OUT" ]]; then
+                    echo -e "${RED}log-out.log does not exist!${RESET}"
+                else
+                    print_section_title "CHECKING DUPLICATES IN LOG-OUT.LOG"
+                    # Duplicates for .csv (processed-ABC-DTxxxxx.csv)
+                    awk '{print $2}' "$LOG_OUT" | grep -E '^processed-ABC-DT[0-9]+\.csv$' | sort | uniq -d > ./dup_csv_out_$selected_date.txt
 
-            echo "🔍 Đang kiểm tra file trùng trong log-out.log..."
+                    # Duplicates for .fin (processed-DTxxxxx.fin)
+                    awk '{print $2}' "$LOG_OUT" | grep -E '^processed-DT[0-9]+\.fin$' | sort | uniq -d > ./dup_fin_out_$selected_date.txt
 
-            # Kiểm tra trùng file .csv (đúng mẫu processed-ABC-DTxxxxx.csv)
-            awk '{print $2}' "$LOG_OUT" | grep -E '^processed-ABC-DT[0-9]+\.csv$' | sort | uniq -d > ./dup_csv_out_$selected_date.txt
+                    if [[ -s ./dup_csv_out_$selected_date.txt ]]; then
+                        echo -e "${YELLOW}Duplicate .csv files found:${RESET}"
+                        cat ./dup_csv_out_$selected_date.txt
+                        echo -e "${GREEN}List saved: ./dup_csv_out_$selected_date.txt${RESET}"
+                    else
+                        echo -e "${GREEN}No duplicate .csv files found.${RESET}"
+                    fi
 
-            # Kiểm tra trùng file .fin (đúng mẫu processed-DTxxxxx.fin)
-            awk '{print $2}' "$LOG_OUT" | grep -E '^processed-DT[0-9]+\.fin$' | sort | uniq -d > ./dup_fin_out_$selected_date.txt
-
-            if [[ -s ./dup_csv_out_$selected_date.txt ]]; then
-                echo "⚠️ Các file .csv trùng:"
-                cat ./dup_csv_out_$selected_date.txt
-                echo "✅ Danh sách file .csv trùng đã lưu ở ./dup_csv_out_$selected_date.txt"
-            else
-                echo "✅ Không phát hiện file .csv nào bị trùng!"
-            fi
-
-            if [[ -s ./dup_fin_out_$selected_date.txt ]]; then
-                echo "⚠️ Các file .fin trùng:"
-                cat ./dup_fin_out_$selected_date.txt
-                echo "✅ Danh sách file .fin trùng đã lưu ở ./dup_fin_out_$selected_date.txt"
-            else
-                echo "✅ Không phát hiện file .fin nào bị trùng!"
-            fi
+                    if [[ -s ./dup_fin_out_$selected_date.txt ]]; then
+                        echo -e "${YELLOW}Duplicate .fin files found:${RESET}"
+                        cat ./dup_fin_out_$selected_date.txt
+                        echo -e "${GREEN}List saved: ./dup_fin_out_$selected_date.txt${RESET}"
+                    else
+                        echo -e "${GREEN}No duplicate .fin files found.${RESET}"
+                    fi
+                    print_menu_border
+                fi
+                echo -e "${GRAY}Press [Enter] to check again, or type 'q' to return to main menu...${RESET}"
+                read back
+                [[ "$back" == "q" || "$back" == "Q" ]] && break
+            done
             ;;
         5)
-            choose_date
+            while true; do
+                choose_date
+                echo -e "${GRAY}Type 'q' to return to main menu, or press [Enter] to change date again...${RESET}"
+                read back
+                [[ "$back" == "q" || "$back" == "Q" ]] && break
+            done
             ;;
         0)
-            echo "👋 Thoát chương trình. Hẹn gặp lại!"
+            print_menu_border
+            echo -e "${GREEN}Goodbye!${RESET}"
+            print_menu_border
             exit 0
             ;;
         *)
-            echo "⚠️ Lựa chọn không hợp lệ. Vui lòng thử lại."
+            echo -e "${RED}Invalid selection. Please try again.${RESET}"
             ;;
     esac
 done
