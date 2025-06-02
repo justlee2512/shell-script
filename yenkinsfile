@@ -1,0 +1,55 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Stage 1') {
+            steps {
+                echo 'Chạy Stage 1'
+            }
+        }
+
+        stage('Song Song 2-3-4') {
+            parallel {
+                stage('Stage 2') {
+                    steps {
+                        echo 'Chạy Stage 2 (song song)'
+                    }
+                }
+                stage('Stage 3') {
+                    steps {
+                        echo 'Chạy Stage 3 (song song)'
+                    }
+                }
+                stage('Stage 4') {
+                    steps {
+                        echo 'Chạy Stage 4 (song song)'
+                    }
+                }
+            }
+        }
+
+        stage('Stage 5') {
+            steps {
+                echo 'Chạy Stage 5'
+            }
+        }
+
+        stage('Stage 6') {
+            steps {
+                echo 'Chạy Stage 6'
+            }
+        }
+
+        stage('Stage 7') {
+            steps {
+                echo 'Chạy Stage 7'
+            }
+        }
+
+        stage('Stage 8') {
+            steps {
+                echo 'Chạy Stage 8'
+            }
+        }
+    }
+}
