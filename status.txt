@@ -2,35 +2,34 @@
 
 # Hàm hiển thị cách sử dụng script
 usage() {
-  echo "Sử dụng: $0 -service <tên_service>"
-  exit 1
+    echo "Sử dụng: $0 -ACTION <start|stop|restart|...> -service <tên_service>"
+    exit 1
 }
 
-# Kiểm tra tham số đầu vào
-while [[ "$#" -gt 0 ]]; do
-  case $1 in
-    -service) service_name="$2"; shift ;;
-    *) usage ;;
-  esac
-  shift
-done
+# Kiểm tra tham số đầu vào (bắt buộc đúng thứ tự: -ACTION ... -service ...)
+if [[ "$1" != "-ACTION" || "$3" != "-service" ]]; then
+    usage
+fi
 
-# Kiểm tra nếu tên service không được cung cấp
-if [[ -z "$service_name" ]]; then
-  echo "Lỗi: Bạn phải cung cấp tên service!"
-  usage
+ACTION="$2"
+service_name="$4"
+
+# Kiểm tra nếu tên service hoặc action không được cung cấp
+if [[ -z "$service_name" || -z "$ACTION" ]]; then
+    echo "Lỗi: Bạn phải cung cấp action và tên service!"
+    usage
 fi
 
 # Khởi tạo phiên D-Bus tạm thời và chạy lệnh
 sudo -u javadm bash -c "
-  export XDG_RUNTIME_DIR=/run/user/$(id -u javadm)
-  export DBUS_SESSION_BUS_ADDRESS=unix:path=\$XDG_RUNTIME_DIR/bus
-  systemctl --user start $service_name.service
+    export XDG_RUNTIME_DIR=/run/user/\$(id -u javadm)
+    export DBUS_SESSION_BUS_ADDRESS=unix:path=\$XDG_RUNTIME_DIR/bus
+    systemctl --user $ACTION $service_name.service
 "
 
 # Kiểm tra kết quả
-if [[ $? -eq 0 ]]; then
-  echo "Service $service_name đã được start thành công."
+if [ $? -eq 0 ]; then
+    echo "Service $service_name đã được $ACTION thành công."
 else
-  echo "Không thể start service $service_name. Vui lòng kiểm tra lại."
+    echo "Không thể $ACTION service $service_name. Vui lòng kiểm tra lại."
 fi
