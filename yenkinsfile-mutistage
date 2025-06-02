@@ -1,0 +1,27 @@
+pipeline {
+    agent any
+    stages {
+        stage('Parallel Stages') {
+            parallel {
+                stage('Job 1') {
+                    steps {
+                        echo "Đang chạy Job 1"
+                        // Các bước xử lý của Job 1
+                    }
+                }
+                stage('Job 2') {
+                    steps {
+                        echo "Đang chạy Job 2"
+                        // Các bước xử lý của Job 2
+                    }
+                }
+                stage('Job 3') {
+                    steps {
+                        echo "Đang chạy Job 3"
+                        // Các bước xử lý của Job 3
+                    }
+                }
+            }
+        }
+    }
+}
