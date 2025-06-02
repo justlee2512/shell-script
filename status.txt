@@ -1,35 +1,35 @@
 #!/bin/bash
 
-# Hàm hiển thị cách sử dụng script
+# Function to display usage
 usage() {
-    echo "Sử dụng: $0 -ACTION <start|stop|restart|...> -service <tên_service>"
+    echo "Usage: $0 -ACTION <start|stop|restart|...> -PATTERN <service_name>"
     exit 1
 }
 
-# Kiểm tra tham số đầu vào (bắt buộc đúng thứ tự: -ACTION ... -service ...)
-if [[ "$1" != "-ACTION" || "$3" != "-service" ]]; then
+# Check required arguments (must be in order: -ACTION ... -PATTERN ...)
+if [[ "$1" != "-ACTION" || "$3" != "-PATTERN" ]]; then
     usage
 fi
 
 ACTION="$2"
-service_name="$4"
+pattern="$4"
 
-# Kiểm tra nếu tên service hoặc action không được cung cấp
-if [[ -z "$service_name" || -z "$ACTION" ]]; then
-    echo "Lỗi: Bạn phải cung cấp action và tên service!"
+# Validate input
+if [[ -z "$pattern" || -z "$ACTION" ]]; then
+    echo "Error: You must provide both action and pattern!"
     usage
 fi
 
-# Khởi tạo phiên D-Bus tạm thời và chạy lệnh
+# Create a temporary D-Bus session and execute the command
 sudo -u javadm bash -c "
     export XDG_RUNTIME_DIR=/run/user/\$(id -u javadm)
     export DBUS_SESSION_BUS_ADDRESS=unix:path=\$XDG_RUNTIME_DIR/bus
-    systemctl --user $ACTION $service_name.service
+    systemctl --user $ACTION $pattern.service
 "
 
-# Kiểm tra kết quả
+# Check result
 if [ $? -eq 0 ]; then
-    echo "Service $service_name đã được $ACTION thành công."
+    echo "Service $pattern has been $ACTION successfully."
 else
-    echo "Không thể $ACTION service $service_name. Vui lòng kiểm tra lại."
+    echo "Failed to $ACTION service $pattern. Please check again."
 fi
