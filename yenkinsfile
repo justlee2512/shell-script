@@ -1,55 +1,271 @@
 pipeline {
     agent any
 
+    parameters {
+        string(name: 'GITHUB_REPO', defaultValue: 'https://github.com/justlee2512/Heart.git', description: 'GitHub repository URL')
+        string(name: 'BRANCH_NAME', defaultValue: 'master', description: 'Git branch to build')
+    }
+
+    tools {
+        maven 'Maven'
+        jdk 'JDK'
+    }
+
+    environment {
+        NEXUS_URL = '192.168.2.83:8081'
+        NEXUS_CREDENTIALS = 'Nexus'
+        REPO_NAME = 'maven-releases'
+        SONAR_HOST_URL = 'http://192.168.2.83:9000/'
+        SONAR_TOKEN = credentials('SonarQube')
+        SONAR_PROJECT_KEY = 'heart'
+        DOCKER_REGISTRY = '192.168.2.83:5000/docker'
+        GIT_HUB_URL = "${params.GITHUB_REPO}"
+    }
+
     stages {
-        stage('Stage 1') {
+        stage('Checkout Code') {
             steps {
-                echo 'Chạy Stage 1'
+                cleanWs()
+                git credentialsId: 'Github', url: "${params.GITHUB_REPO}", branch: "${params.BRANCH_NAME}"
             }
         }
 
-        stage('Song Song 2-3-4') {
-            parallel {
-                stage('Stage 2') {
-                    steps {
-                        echo 'Chạy Stage 2 (song song)'
+        stage('Read POM Information') {
+            steps {
+                script {
+                    def pom = readMavenPom file: 'pom.xml'
+                    env.GROUP_ID = "${pom.groupId}"
+                    env.ARTIFACT_ID = "${pom.artifactId}"
+                    env.VERSION = "${pom.version}"
+                    env.FILE_NAME = "target/${pom.artifactId}-${pom.version}.war"
+                    env.DOCKER_IMAGE = "${pom.artifactId}:${pom.version}"
+                    env.K8S_NAMESPACE = "${pom.artifactId}"
+                }
+                echo """
+                GROUP_ID: ${env.GROUP_ID}
+                ARTIFACT_ID: ${env.ARTIFACT_ID}
+                VERSION: ${env.VERSION}
+                FILE_NAME: ${env.FILE_NAME}
+                DOCKER_IMAGE: ${env.DOCKER_IMAGE}
+                K8S_NAMESPACE: ${env.K8S_NAMESPACE}
+                """
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                sh 'rm -f target/*.war || true' // Xoá hết các file war cũ
+                sh 'mvn clean install'
+                sh 'ls -la target'
+                stash includes: "${env.FILE_NAME}", name: 'war-file'
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh '''
+                        mvn sonar:sonar \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.host.url=${SONAR_HOST_URL} \
+                        -Dsonar.login=${SONAR_TOKEN}
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy WAR to Nexus') {
+            steps {
+                nexusArtifactUploader(
+                    nexusVersion: 'nexus3',
+                    protocol: 'http',
+                    nexusUrl: "${NEXUS_URL}",
+                    groupId: "${GROUP_ID}",
+                    version: "${VERSION}",
+                    repository: "${REPO_NAME}",
+                    credentialsId: "${NEXUS_CREDENTIALS}",
+                    artifacts: [
+                        [
+                            artifactId: "${ARTIFACT_ID}",
+                            classifier: '',
+                            file: "${FILE_NAME}",
+                            type: 'war'
+                        ]
+                    ]
+                )
+            }
+        }
+
+        stage('Build Docker Image') {
+            agent { label 'docker-builder' }
+            steps {
+                unstash 'war-file'
+                writeFile file: 'Dockerfile', text: """
+                    FROM tomcat:10.1-jdk17
+                    COPY target/${ARTIFACT_ID}-${VERSION}.war /usr/local/tomcat/webapps/
+                    EXPOSE 8080
+                    CMD ["catalina.sh", "run"]
+                """
+                sh """
+                    docker rm -f ${ARTIFACT_ID}-container || true
+                    docker image prune -f || true
+                    docker build -t ${DOCKER_IMAGE} .
+                    docker tag ${DOCKER_IMAGE} ${DOCKER_REGISTRY}/${DOCKER_IMAGE}
+                """
+            }
+        }
+
+        stage('Delete Old Docker Images') {
+            agent { label 'docker-builder' }
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIALS}", usernameVariable: 'NEXUS_USERNAME', passwordVariable: 'NEXUS_PASSWORD')]) {
+                    sh """
+                        curl -u ${NEXUS_USERNAME}:${NEXUS_PASSWORD} -X GET "http://${NEXUS_URL}/service/rest/v1/components?repository=${REPO_NAME}" | \
+                        python3 -c "import sys, json; [print(item['id']) for item in json.load(sys.stdin)['items'] if item['name'] == '${ARTIFACT_ID}']" | \
+                        xargs -I {} curl -u ${NEXUS_USERNAME}:${NEXUS_PASSWORD} -X DELETE "http://${NEXUS_URL}/service/rest/v1/components/{}"
+                    """                    
+                }
+            }
+        }
+
+        stage('Push Docker Image to Nexus') {
+            agent { label 'docker-builder' }
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIALS}", usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    sh """
+                        docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD} ${DOCKER_REGISTRY}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE}
+                        docker logout ${DOCKER_REGISTRY}
+                    """
+                }
+            }
+        }
+
+        stage('Pull and Run Docker Image') {
+            agent { label 'docker-builder' }
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIALS}", usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    sh """
+                        docker login -u ${DOCKER_USERNAME} -p ${DOCKER_PASSWORD} ${DOCKER_REGISTRY}
+                        docker pull ${DOCKER_REGISTRY}/${DOCKER_IMAGE}
+                        docker run -d --name ${ARTIFACT_ID}-container -p 8080:8080 ${DOCKER_REGISTRY}/${DOCKER_IMAGE}
+                        docker logout ${DOCKER_REGISTRY}
+                    """
+                }
+            }
+        }
+
+        stage('Create Nexus Secret in Kubernetes') {
+            agent { label 'docker-builder' }
+            steps {
+                withKubeConfig([credentialsId: 'k8s']) {
+                    withCredentials([usernamePassword(credentialsId: "${NEXUS_CREDENTIALS}", usernameVariable: 'NEXUS_USERNAME', passwordVariable: 'NEXUS_PASSWORD')]) {
+                        sh """
+                            kubectl create namespace ${K8S_NAMESPACE} || true
+                            kubectl delete secret nexus-docker-secret --namespace=${K8S_NAMESPACE} || true
+                            kubectl create secret docker-registry nexus-docker-secret \
+                                --docker-server=${DOCKER_REGISTRY} \
+                                --docker-username=${NEXUS_USERNAME} \
+                                --docker-password=${NEXUS_PASSWORD} \
+                                --namespace=${K8S_NAMESPACE}
+                        """
                     }
                 }
-                stage('Stage 3') {
-                    steps {
-                        echo 'Chạy Stage 3 (song song)'
+            }
+        }
+
+        stage('Delete Old Kubernetes Pods') {
+            agent { label 'docker-builder' }
+            steps {
+                withKubeConfig([credentialsId: 'k8s']) {
+                    sh """
+                        cd /home/tuan/${ARTIFACT_ID}/manifests || true
+                        kubectl delete -f deployment.yaml --namespace=${K8S_NAMESPACE} || true
+                        kubectl delete -f service.yaml --namespace=${K8S_NAMESPACE} || true
+                        kubectl delete -f ingress.yaml --namespace=${K8S_NAMESPACE} || true
+                        rm -rf /home/tuan/${ARTIFACT_ID} || true
+                    """
+                }
+            }
+        }
+
+        stage('Cleanup Docker Images on All Nodes') {
+            agent { label 'docker-builder' }
+            steps {
+                withKubeConfig([credentialsId: 'k8s']) {
+                    script {
+                        def nodes = sh(
+                            script: "kubectl get nodes -o jsonpath='{.items[*].metadata.name}'",
+                            returnStdout: true
+                        ).trim().split(' ')
+                        nodes.each { node ->
+                            echo "Cleaning Docker images on node: ${node}"
+                            sh """
+                                kubectl debug node/${node} --image=busybox -- chroot /host sh -c "docker image prune -af"
+                            """
+                        }
                     }
                 }
-                stage('Stage 4') {
-                    steps {
-                        echo 'Chạy Stage 4 (song song)'
+            }
+        }
+
+        stage('Deploy Kubernetes Resources') {
+            agent { label 'docker-builder' }
+            steps {
+                withKubeConfig([credentialsId: 'k8s']) {
+                    withCredentials([usernamePassword(credentialsId: 'Github', usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        sh """
+                            git clone https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/justlee2512/kubernetes-deployment.git /home/tuan/${ARTIFACT_ID}
+                            cd /home/tuan/${ARTIFACT_ID}/manifests
+                            kubectl apply -f deployment.yaml
+                            kubectl apply -f service.yaml
+                            kubectl apply -f ingress.yaml
+                        """
                     }
                 }
             }
         }
 
-        stage('Stage 5') {
+        stage('Cleanup') {
+            agent { label 'docker-builder' }
             steps {
-                echo 'Chạy Stage 5'
+                script {
+                    echo "Starting final Cleanup..."
+
+                    if (sh(script: 'command -v docker', returnStatus: true) == 0) {
+                        sh """
+                            docker container prune -f || true
+                            docker image prune -af || true
+                        """
+                        echo "Docker cleanup done."
+                    }
+
+                    if (env.ARTIFACT_ID) {
+                        sh "rm -rf /home/tuan/${ARTIFACT_ID} || true"
+                        echo "/home/tuan/${ARTIFACT_ID} deleted."
+                    }
+
+                    env.GROUP_ID = ""
+                    env.ARTIFACT_ID = ""
+                    env.VERSION = ""
+                    env.FILE_NAME = ""
+                    env.DOCKER_IMAGE = ""
+                    env.K8S_NAMESPACE = ""
+                    env.SONAR_TOKEN = ""
+                    
+                    deleteDir()
+                    echo "Workspace cleaned and environment reset."
+                }
             }
         }
+    }
 
-        stage('Stage 6') {
-            steps {
-                echo 'Chạy Stage 6'
-            }
+    post {
+        success {
+            echo '✅ Pipeline completed successfully!'
         }
-
-        stage('Stage 7') {
-            steps {
-                echo 'Chạy Stage 7'
-            }
-        }
-
-        stage('Stage 8') {
-            steps {
-                echo 'Chạy Stage 8'
-            }
+        failure {
+            echo '❌ Pipeline failed!'
         }
     }
 }
