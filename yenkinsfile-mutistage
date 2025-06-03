@@ -25,3 +25,20 @@ pipeline {
         }
     }
 }
+
+
+- name: Lấy package mới nhất và copy qua folder khác
+  hosts: all
+  tasks:
+    - name: Tìm file package mới nhất
+      shell: |
+        ls -t /source_folder/*.tar.gz | head -n1
+      register: latest_package
+      changed_when: false
+
+    - name: Copy package mới nhất sang folder khác
+      copy:
+        src: "{{ latest_package.stdout }}"
+        dest: /destination_folder/
+        remote_src: yes
+      when: latest_package.stdout != ""
