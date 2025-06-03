@@ -42,3 +42,6 @@ pipeline {
         dest: /destination_folder/
         remote_src: yes
       when: latest_package.stdout != ""
+
+
+      src: "{{ folderBK }}/{{ latest_package.stdout | replace('\"','') | replace(\"'\",'') }}"
