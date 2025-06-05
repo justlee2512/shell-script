@@ -42,14 +42,11 @@ log_out() {
 process_file() {
     file="$1"
     base_name=$(basename "$file")
-    if [[ "$base_name" == ABC-DT*.csv ]]; then
-        number=$(echo "$base_name" | grep -oE '[0-9]+')
-        new_name="$PROCESSED_DIR/processed-ABC-DT${number}-${HOSTNAME}.csv"
-        mv "$file" "$new_name"
-        log_process "$(basename "$new_name")"
-    elif [[ "$base_name" == DT*.fin ]]; then
-        number=$(echo "$base_name" | grep -oE '[0-9]+')
-        new_name="$PROCESSED_DIR/processed-DT${number}.fin"
+    ext="${base_name##*.}"
+    name_without_ext="${base_name%.*}"
+    new_name="$PROCESSED_DIR/processed-${name_without_ext}-${HOSTNAME}.${ext}"
+
+    if [[ "$base_name" == ABC-DT*.csv || "$base_name" == DT*.fin ]]; then
         mv "$file" "$new_name"
         log_process "$(basename "$new_name")"
     else
