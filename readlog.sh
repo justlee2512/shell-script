@@ -202,6 +202,9 @@ while true; do
             awk '{print $2}' "$LOG_OUT" | grep -E '^processed-ABC-DT[0-9]+.*\.csv$' | sort | uniq -d > ./dup_csv_out_$selected_date.txt
             # Kiểm tra trùng file .fin (match cả tên dài processed-DTxxxx-vxxxxx.fin)
             awk '{print $2}' "$LOG_OUT" | grep -E '^processed-DT[0-9]+.*\.fin$' | sort | uniq -d > ./dup_fin_out_$selected_date.txt
+            
+            dup_csv_count=$(wc -l < ./dup_csv_out_$selected_date.txt)
+            dup_fin_count=$(wc -l < ./dup_fin_out_$selected_date.txt)
 
             if [[ -s ./dup_csv_out_$selected_date.txt ]]; then
                 echo -e "${YELLOW}⚠️ Các file .csv trùng!${NC}"
